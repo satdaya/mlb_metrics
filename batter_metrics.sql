@@ -98,16 +98,20 @@ cte_batting_slash_line AS (
     ,first_name
     ,last_name
     ,ROUND( SUM(cte_pas.ab_safe_or_out) / SUM(cte_pas.is_at_bat) , 3) AS batting_avg
-    ,ROUND( SUM(cte_pas.pa_safe_or_out) / SUM(cte_pas.is_plate_appearance), 3) AS obp
-    ,ROUND( SUM(cte_pas.bases_for_slg) / SUM(cte_pas.is_at_bat), 3) as slg_percentage
-    ,obp + slg_percentage AS ops
+    ,ROUND( SUM(cte_pas.pa_safe_or_out) / SUM(cte_pas.is_plate_appearance), 3) AS obp --on base percentage
+    ,ROUND( SUM(cte_pas.bases_for_slg) / SUM(cte_pas.is_at_bat), 3) as slg_percentage -- slugging percentage
+    ,obp + slg_percentage AS ops -- on base percentage plus slugging percentage
     --wOBA (weighted on base average) uses a predetermined scale (varies by season) to weight significance of outcome.
     ,ROUND( ( (SUM(walk) * .690) + (SUM(hbp) * .719) + (SUM(hbp) * .719) + (SUM(single) * .870) + (SUM(double) * 1.217) + (SUM(triple) * 1.529)
       + (SUM(home_run) * 1.940) ) / (SUM(is_at_bat) + SUM(walk) - SUM(ibb) + SUM(sf) + SUM(hbp) ), 3 ) AS wOBA
+    --wRAA (weight runs above average) - how many runs a player adds to the team compared to the average player (scored at 0)
+    ,ROUND( ( (wOBA - .320) / 1.157 ) * SUM(is_plate_appearance), 3 ) as wRAA
   FROM cte_pas
   LEFT JOIN players
   ON cte_pas.batter_id = players.id
   GROUP BY 1,2,3
+  --to qualify for batting title, a player must average 3.1 plate appearances per game, which comes out to 502 per season. Without this rule, minor league players with minimal
+  --a handful of plate appearances would skew the metrics
   HAVING SUM(is_plate_appearance) >= 502
   ORDER BY 7 DESC
   )
